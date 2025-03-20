@@ -1,0 +1,15 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: aws-sqs-queue-scaledobject
+spec:
+  scaleTargetRef:
+    name: keda-app-deployment
+  triggers:
+    - type: aws-sqs-queue
+      authenticationRef:
+        name: keda-trigger-auth
+      metadata:
+        queueURL: https://sqs.us-west-2.amazonaws.com/<aws_account_id>/keda-queue
+        queueLength: "10"
+        awsRegion: us-west-2

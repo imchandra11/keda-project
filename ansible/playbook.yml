@@ -1,0 +1,6 @@
+- hosts: eks_nodes
+  become: true
+  roles:
+    - common
+    - kubernetes
+    - deploy

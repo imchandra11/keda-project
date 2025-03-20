@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keda-app-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-app
+  template:
+    metadata:
+      labels:
+        app: keda-app
+    spec:
+      serviceAccountName: keda-sa
+      containers:
+        - name: keda-app
+          image: <aws_account_id>.dkr.ecr.us-west-2.amazonaws.com/keda-app:latest
+          ports:
+            - containerPort: 8080
