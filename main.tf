@@ -78,7 +78,7 @@ data "aws_caller_identity" "current" {}
 
 module "ecr" {
   source         = "./modules/ecr"
-  repository_name = "${var.project_name}/kedaecr"  # Or whatever you want to name it
+  repository_name = "${var.project_name}/kedaecr" 
   project_name   = var.project_name
   environment    = var.environment
   tags           = var.tags

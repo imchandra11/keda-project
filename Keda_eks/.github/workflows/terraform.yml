@@ -1,0 +1,76 @@
+# .github/workflows/terraform.yml
+name: Terraform Infrastructure Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+  pull_request:
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.0
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init -backend=false
+      
+      - name: Terraform Validate
+        run: |
+          cd terraform
+          terraform validate
+
+  apply:
+    name: Apply Infrastructure Changes
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.0
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Terraform Init
+        run: |
+          cd terraform
+          terraform init
+
+      - name: Terraform Apply
+        run: |
+          cd terraform
+          terraform apply -auto-approve
+        
+      - name: Export Terraform Outputs
+        id: terraform_output
+        run: |
+          cd terraform
+          echo "::set-output name=ec2_public_ip::$(terraform output -raw ec2_public_ip)"
+          echo "::set-output name=cluster_name::$(terraform output -raw eks_cluster_name)"
+          echo "::set-output name=sqs_queue_url::$(terraform output -raw sqs_queue_url)"

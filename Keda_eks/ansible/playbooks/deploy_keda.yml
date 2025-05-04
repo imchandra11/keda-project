@@ -1,0 +1,40 @@
+# ansible/playbooks/deploy_keda.yml
+---
+- name: Deploy KEDA to EKS cluster
+  hosts: management
+  become: false
+  
+  vars:
+    aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-west-2', true) }}"
+    cluster_name: "{{ lookup('env', 'CLUSTER_NAME') | default('keda-poc', true) }}"
+    sqs_queue_name: "{{ lookup('env', 'SQS_QUEUE_NAME') | default('keda-queue', true) }}"
+  
+  tasks:
+    - name: Check if kubectl can access the cluster
+      command: kubectl get nodes
+      register: kubectl_result
+      failed_when: kubectl_result.rc != 0
+      changed_when: false
+    
+    - name: Add KEDA Helm repository
+      command: helm repo add kedacore https://kedacore.github.io/charts
+      changed_when: true
+    
+    - name: Update Helm repositories
+      command: helm repo update
+      changed_when: true
+    
+    - name: Install KEDA using Helm
+      command: helm install keda kedacore/keda --namespace keda --create-namespace
+      register: keda_install
+      changed_when: keda_install.rc == 0
+      failed_when: keda_install.rc != 0 and "already exists" not in keda_install.stderr
+    
+    - name: Wait for KEDA deployment to complete
+      command: kubectl get deployment keda-operator -n keda
+      register: keda_ready
+      until: "'1/1' in keda_ready.stdout"
+      retries: 30
+      delay: 10
+      changed_when: false
+      failed_when: keda_ready.rc != 0

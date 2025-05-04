@@ -1,0 +1,78 @@
+# .github/workflows/deploy.yml
+name: Deploy KEDA Application
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ansible/**'
+      - 'kubernetes/**'
+      - 'lambda/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform (setup, deploy_keda, deploy_app, all)'
+        required: true
+        default: 'all'
+
+jobs:
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/keda-key.pem
+          chmod 600 ~/.ssh/keda-key.pem
+
+      - name: Install Ansible
+        run: |
+          pip install ansible boto3
+
+      - name: Get EC2 Public IP
+        id: get_ip
+        run: |
+          EC2_IP=$(aws ec2 describe-instances --filters "Name=tag:Name,Values=kedaconnector" --query "Reservations[0].Instances[0].PublicIpAddress" --output text)
+          echo "::set-output name=ec2_ip::$EC2_IP"
+
+      - name: Create Ansible inventory
+        run: |
+          cat > inventory.yml << EOF
+          all:
+            children:
+              management:
+                hosts:
+                  kedaconnector:
+                    ansible_host: ${{ steps.get_ip.outputs.ec2_ip }}
+                    ansible_user: ubuntu
+                    ansible_ssh_private_key_file: ~/.ssh/keda-key.pem
+                    ansible_python_interpreter: /usr/bin/python3
+          EOF
+
+      - name: Setup EC2 Instances
+        if: github.event.inputs.action == 'setup' || github.event.inputs.action == 'all' || github.event.inputs.action == ''
+        run: |
+          ansible-playbook -i inventory.yml ansible/playbooks/setup_ec2.yml
+
+      - name: Deploy KEDA
+        if: github.event.inputs.action == 'deploy_keda' || github.event.inputs.action == 'all' || github.event.inputs.action == ''
+        run: |
+          ansible-playbook -i inventory.yml ansible/playbooks/deploy_keda.yml
+
+      - name: Deploy Application
+        if: github.event.inputs.action == 'deploy_app' || github.event.inputs.action == 'all' || github.event.inputs.action == ''
+        run: |
+          ansible-playbook -i inventory.yml ansible/playbooks/deploy_app.yml

@@ -4,6 +4,8 @@ data "aws_eks_cluster" "this" {
   name = var.eks_cluster_name
 }
 
+
+# Extracts the TLS certificate thumbprint from the EKS cluster's OIDC issuer URL, used for IAM integration.
 data "tls_certificate" "eks" {
   url = data.aws_eks_cluster.this.identity[0].oidc[0].issuer
 }

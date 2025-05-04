@@ -1,0 +1,97 @@
+# ansible/playbooks/setup_ec2.yml
+---
+- name: Setup EC2 instances for EKS and KEDA
+  hosts: management
+  become: true
+  
+  vars:
+    aws_region: "{{ lookup('env', 'AWS_REGION') | default('us-west-2', true) }}"
+    cluster_name: "{{ lookup('env', 'CLUSTER_NAME') | default('keda-poc', true) }}"
+  
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+    
+    - name: Install required packages
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - python3-pip
+          - unzip
+        state: present
+    
+    - name: Install AWS CLI
+      block:
+        - name: Download AWS CLI v2 installer
+          get_url:
+            url: https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+            dest: /tmp/awscliv2.zip
+            mode: '0644'
+        
+        - name: Unzip AWS CLI v2 installer
+          unarchive:
+            src: /tmp/awscliv2.zip
+            dest: /tmp
+            remote_src: yes
+        
+        - name: Install AWS CLI v2
+          command: /tmp/aws/install
+          args:
+            creates: /usr/local/bin/aws
+    
+    - name: Install kubectl
+      block:
+        - name: Get latest kubectl version
+          shell: "curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt"
+          register: kubectl_version
+          changed_when: false
+        
+        - name: Download kubectl
+          get_url:
+            url: "https://storage.googleapis.com/kubernetes-release/release/{{ kubectl_version.stdout }}/bin/linux/amd64/kubectl"
+            dest: /usr/local/bin/kubectl
+            mode: '0755'
+    
+    - name: Install Docker
+      block:
+        - name: Add Docker repository
+          shell: |
+            sudo apt-get update
+            sudo apt-get install ca-certificates curl
+            sudo install -m 0755 -d /etc/apt/keyrings
+            sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+            sudo chmod a+r /etc/apt/keyrings/docker.asc
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            sudo apt-get update
+        
+        - name: Install Docker Engine
+          apt:
+            name:
+              - docker-ce
+              - docker-ce-cli
+              - containerd.io
+              - docker-buildx-plugin
+              - docker-compose-plugin
+            state: present
+        
+        - name: Add user to docker group
+          user:
+            name: ubuntu
+            groups: docker
+            append: yes
+    
+    - name: Configure kubectl for EKS cluster
+      become: false
+      command: aws eks update-kubeconfig --region {{ aws_region }} --name {{ cluster_name }}
+    
+    - name: Install ECR Docker credential helper
+      get_url:
+        url: https://amazon-ecr-credential-helper-releases.s3.us-east-2.amazonaws.com/latest/linux-amd64/docker-credential-ecr-login
+        dest: /usr/local/bin/docker-credential-ecr-login
+        mode: '0755'

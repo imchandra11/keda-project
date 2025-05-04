@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keda-app
+  labels:
+    app: keda-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keda-app
+  template:
+    metadata:
+      labels:
+        app: keda-app
+    spec:
+      serviceAccountName: keda-app-sa
+      containers:
+      - name: keda-app
+        image: 733466249348.dkr.ecr.us-west-2.amazonaws.com/kedaecr:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: AWS_REGION
+          value: "us-west-2"
+        - name: SQS_QUEUE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: keda-config
+              key: sqs_queue_url
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"

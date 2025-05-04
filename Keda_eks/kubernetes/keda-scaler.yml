@@ -1,0 +1,19 @@
+# kubernetes/keda-scaler.yaml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: keda-app-scaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: keda-app
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  pollingInterval: 15
+  cooldownPeriod: 30
+  triggers:
+  - type: aws-sqs-queue
+    metadata:
+      queueURL: ${SQS_QUEUE_URL}
+      queueLength: "5"
+      awsRegion: ${AWS_REGION}
