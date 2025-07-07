@@ -6,6 +6,12 @@
 ### 📖 Project Overview  
 This project implements event-driven autoscaling on **Amazon EKS** using **KEDA (Kubernetes Event-Driven Autoscaling)**. The solution scales Kubernetes pods based on messages in an **Amazon SQS queue**, triggered by file uploads to an **S3 bucket**.  
 
+
+## 🖥️ Project Architecture
+<div align="center">
+  <img src="kedaarc.jpg" alt="Architecture" width="800">
+</div>
+
 **Workflow**:  
 1. Files uploaded to S3 trigger a **Lambda function**.  
 2. Lambda reads `metadata.txt` to extract filenames and sends one message per file to SQS.  
@@ -34,6 +40,13 @@ This project implements event-driven autoscaling on **Amazon EKS** using **KEDA 
    - IRSA for secure pod-level AWS permissions.  
 
 ---
+
+
+### 🖥️ Low level Architecture
+<div align="center">
+  <img src="keda.jpg" alt="Architecture" width="800">
+</div>
+
 
 ### ⚠️ Prerequisites  
 1. **AWS Account** with permissions for:  
